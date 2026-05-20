@@ -1,0 +1,163 @@
+---
+title: "Introduction to Rvoterdistance"
+author: "Loren Collingwood"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to Rvoterdistance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Overview
+
+**Rvoterdistance** calculates the geographic distance between voters and
+polling locations (or vote-by-mail drop boxes) using the Haversine
+great-circle formula, implemented in C++ for speed. The package supports:
+
+- **Nearest location**: find the single closest polling place for each voter
+- **k-nearest locations**: find the k closest locations per voter
+- **Distance threshold**: find all locations within a specified radius
+- **sf integration**: pass `sf` POINT geometries directly
+
+## Installation
+
+```{r install, eval = FALSE}
+# From GitHub:
+remotes::install_github("lorenc5/Rvoterdistance")
+```
+
+## Included Data
+
+The package ships with two example datasets:
+
+- `king_dbox`: King County, WA ballot drop box locations and a sample of
+  voters
+- `meck_ev`: Mecklenburg County, NC early voting locations and a sample of
+  voters
+
+```{r data}
+library(Rvoterdistance)
+data(meck_ev)
+
+str(voter_meck)
+str(early_meck)
+```
+
+## Basic Usage: Nearest Location
+
+The main function is `nearest_location()`. With the default `k = 1`, it
+returns one row per voter with the distance to the nearest polling
+location:
+
+```{r nearest}
+result <- nearest_location(
+  voters    = voter_meck,
+  locations = early_meck,
+  voter_coords    = c("lat", "long"),
+  location_coords = c("lat", "long")
+)
+
+head(result)
+```
+
+The output includes the voter data, the matched location data, and three
+distance columns: `distance_m` (meters), `distance_km`, and
+`distance_miles`.
+
+## k-Nearest Locations
+
+To find the 3 closest early voting sites for each voter:
+
+```{r knearest}
+result_k3 <- nearest_location(
+  voter_meck, early_meck,
+  voter_coords    = c("lat", "long"),
+  location_coords = c("lat", "long"),
+  k = 3,
+  append_data = FALSE
+)
+
+head(result_k3, 9)
+```
+
+The output is in long format with a `rank` column (1 = nearest).
+
+## Distance Threshold
+
+Find all early voting locations within 5 miles of each voter:
+
+```{r threshold}
+result_5mi <- nearest_location(
+  voter_meck[1:20, ], early_meck,
+  voter_coords    = c("lat", "long"),
+  location_coords = c("lat", "long"),
+  max_dist = 5,
+  units = "miles",
+  append_data = FALSE
+)
+
+head(result_5mi, 10)
+
+# How many locations within 5 miles per voter?
+table(result_5mi$voter_id)
+```
+
+## Using sf Objects
+
+If your data are already `sf` POINT objects, pass them directly ---
+no need to specify coordinate column names:
+
+```{r sf, eval = requireNamespace("sf", quietly = TRUE)}
+library(sf)
+
+voters_sf <- st_as_sf(voter_meck, coords = c("long", "lat"), crs = 4326)
+locs_sf   <- st_as_sf(early_meck, coords = c("long", "lat"), crs = 4326)
+
+result_sf <- nearest_location(voters_sf, locs_sf, append_data = FALSE)
+head(result_sf)
+```
+
+If the CRS is not WGS-84 (EPSG:4326), the package automatically
+transforms to WGS-84 and prints a message.
+
+## Convenience Functions
+
+For quick calculations without the full `nearest_location()` interface:
+
+```{r convenience}
+# Minimum distance in km for each voter
+km <- dist_km(voter_meck$lat, voter_meck$long,
+              early_meck$lat, early_meck$long)
+summary(km)
+
+# Minimum distance in miles
+mi <- dist_mile(voter_meck$lat, voter_meck$long,
+                early_meck$lat, early_meck$long)
+summary(mi)
+
+# Single-pair distance (e.g., Charlotte to Raleigh)
+haversine(35.2271, -80.8431, 35.7796, -78.6382, units = "miles")
+```
+
+## Performance
+
+The Haversine computation runs in C++ and uses partial sorting
+(`std::nth_element`) for k-nearest queries, giving O(n) per voter
+instead of O(n log n). For large voter files, enable progress reporting:
+
+```{r progress, eval = FALSE}
+result <- nearest_location(
+  big_voter_file, locations,
+  voter_coords = c("lat", "lon"),
+  location_coords = c("lat", "lon"),
+  k = 3,
+  progress = TRUE
+)
+```
