@@ -41,21 +41,24 @@
 #' # Nearest single location for each voter
 #' result <- nearest_location(voter_meck, early_meck,
 #'   voter_coords = c("lat", "long"),
-#'   location_coords = c("lat", "long"))
+#'   location_coords = c("lat", "long")
+#' )
 #' head(result)
 #'
 #' # 3 nearest locations per voter
 #' result_k3 <- nearest_location(voter_meck, early_meck,
 #'   voter_coords = c("lat", "long"),
 #'   location_coords = c("lat", "long"),
-#'   k = 3)
+#'   k = 3
+#' )
 #' head(result_k3)
 #'
 #' # All locations within 10 km
 #' result_10km <- nearest_location(voter_meck, early_meck,
 #'   voter_coords = c("lat", "long"),
 #'   location_coords = c("lat", "long"),
-#'   max_dist = 10, units = "km")
+#'   max_dist = 10, units = "km"
+#' )
 #' head(result_10km)
 nearest_location <- function(voters,
                              locations,
@@ -66,7 +69,6 @@ nearest_location <- function(voters,
                              units = c("km", "miles", "meters"),
                              append_data = TRUE,
                              progress = FALSE) {
-
   units <- match.arg(units)
 
   # --- Extract coordinates ---
@@ -75,8 +77,8 @@ nearest_location <- function(voters,
 
   voter_lat <- v_coords[, 1]
   voter_lon <- v_coords[, 2]
-  loc_lat   <- l_coords[, 1]
-  loc_lon   <- l_coords[, 2]
+  loc_lat <- l_coords[, 1]
+  loc_lon <- l_coords[, 2]
 
   # --- Input validation ---
   .validate_coords(voter_lat, voter_lon, "voters")
@@ -89,15 +91,21 @@ nearest_location <- function(voters,
   if (!is.null(max_dist)) {
     # Threshold mode
     max_dist_m <- .to_meters(max_dist, units)
-    raw <- cpp_within_threshold(voter_lat, voter_lon, loc_lat, loc_lon,
-                                max_dist_m, progress)
-    result <- .format_threshold_result(raw, voters, locations, units,
-                                       append_data)
+    raw <- cpp_within_threshold(
+      voter_lat, voter_lon, loc_lat, loc_lon,
+      max_dist_m, progress
+    )
+    result <- .format_threshold_result(
+      raw, voters, locations, units,
+      append_data
+    )
   } else {
     # k-nearest mode
     raw <- cpp_k_nearest(voter_lat, voter_lon, loc_lat, loc_lon, k, progress)
-    result <- .format_knearest_result(raw, k, voters, locations, units,
-                                      append_data)
+    result <- .format_knearest_result(
+      raw, k, voters, locations, units,
+      append_data
+    )
   }
 
   result

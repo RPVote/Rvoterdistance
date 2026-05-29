@@ -58,9 +58,9 @@ location:
 
 ```{r nearest}
 result <- nearest_location(
-  voters    = voter_meck,
+  voters = voter_meck,
   locations = early_meck,
-  voter_coords    = c("lat", "long"),
+  voter_coords = c("lat", "long"),
   location_coords = c("lat", "long")
 )
 
@@ -78,7 +78,7 @@ To find the 3 closest early voting sites for each voter:
 ```{r knearest}
 result_k3 <- nearest_location(
   voter_meck, early_meck,
-  voter_coords    = c("lat", "long"),
+  voter_coords = c("lat", "long"),
   location_coords = c("lat", "long"),
   k = 3,
   append_data = FALSE
@@ -96,7 +96,7 @@ Find all early voting locations within 5 miles of each voter:
 ```{r threshold}
 result_5mi <- nearest_location(
   voter_meck[1:20, ], early_meck,
-  voter_coords    = c("lat", "long"),
+  voter_coords = c("lat", "long"),
   location_coords = c("lat", "long"),
   max_dist = 5,
   units = "miles",
@@ -118,7 +118,7 @@ no need to specify coordinate column names:
 library(sf)
 
 voters_sf <- st_as_sf(voter_meck, coords = c("long", "lat"), crs = 4326)
-locs_sf   <- st_as_sf(early_meck, coords = c("long", "lat"), crs = 4326)
+locs_sf <- st_as_sf(early_meck, coords = c("long", "lat"), crs = 4326)
 
 result_sf <- nearest_location(voters_sf, locs_sf, append_data = FALSE)
 head(result_sf)
@@ -133,13 +133,17 @@ For quick calculations without the full `nearest_location()` interface:
 
 ```{r convenience}
 # Minimum distance in km for each voter
-km <- dist_km(voter_meck$lat, voter_meck$long,
-              early_meck$lat, early_meck$long)
+km <- dist_km(
+  voter_meck$lat, voter_meck$long,
+  early_meck$lat, early_meck$long
+)
 summary(km)
 
 # Minimum distance in miles
-mi <- dist_mile(voter_meck$lat, voter_meck$long,
-                early_meck$lat, early_meck$long)
+mi <- dist_mile(
+  voter_meck$lat, voter_meck$long,
+  early_meck$lat, early_meck$long
+)
 summary(mi)
 
 # Single-pair distance (e.g., Charlotte to Raleigh)

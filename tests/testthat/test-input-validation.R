@@ -47,7 +47,8 @@ test_that("k < 1 causes error", {
     nearest_location(voter_meck, early_meck,
       voter_coords = c("lat", "long"),
       location_coords = c("lat", "long"),
-      k = 0),
+      k = 0
+    ),
     "k.*>= 1"
   )
 })

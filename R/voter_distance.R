@@ -12,8 +12,10 @@
 #' @export
 #' @examples
 #' data(meck_ev)
-#' d <- dist_km(voter_meck$lat, voter_meck$long,
-#'              early_meck$lat, early_meck$long)
+#' d <- dist_km(
+#'   voter_meck$lat, voter_meck$long,
+#'   early_meck$lat, early_meck$long
+#' )
 #' summary(d)
 dist_km <- function(lat1, lon1, lat2, lon2) {
   .validate_coords(lat1, lon1, "voters")
@@ -37,8 +39,10 @@ dist_km <- function(lat1, lon1, lat2, lon2) {
 #' @export
 #' @examples
 #' data(meck_ev)
-#' d <- dist_mile(voter_meck$lat, voter_meck$long,
-#'                early_meck$lat, early_meck$long)
+#' d <- dist_mile(
+#'   voter_meck$lat, voter_meck$long,
+#'   early_meck$lat, early_meck$long
+#' )
 #' summary(d)
 dist_mile <- function(lat1, lon1, lat2, lon2) {
   .validate_coords(lat1, lon1, "voters")

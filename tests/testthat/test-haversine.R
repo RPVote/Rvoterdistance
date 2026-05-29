@@ -16,7 +16,7 @@ test_that("haversine is symmetric", {
 })
 
 test_that("haversine respects units argument", {
-  d_m  <- haversine(40.7128, -74.0060, 51.5074, -0.1278, units = "meters")
+  d_m <- haversine(40.7128, -74.0060, 51.5074, -0.1278, units = "meters")
   d_km <- haversine(40.7128, -74.0060, 51.5074, -0.1278, units = "km")
   d_mi <- haversine(40.7128, -74.0060, 51.5074, -0.1278, units = "miles")
   expect_equal(d_km, d_m / 1000)
