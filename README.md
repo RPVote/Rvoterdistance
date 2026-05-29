@@ -18,6 +18,8 @@ Calculates the geographic distance between voters in a voter file and multiple p
 ```r
 # From GitHub:
 remotes::install_github("lorenc5/Rvoterdistance")
+# or
+remotes::install_github("RPVote/Rvoterdistance")
 ```
 
 ## Quick Start
