@@ -1,4 +1,6 @@
 # Rvoterdistance
+[![R build status](https://github.com/RPVote/Rvoterdistance/workflows/R-CMD-check/badge.svg)](https://github.com/RPVote/Rvoterdistance/actions?workflow=R-CMD-check)
+[![Style status](https://github.com/RPVote/Rvoterdistance/workflows/Styler/badge.svg)](https://github.com/RPVote/Rvoterdistance/actions?workflow=Styler)
 
 Calculates the geographic distance between voters in a voter file and multiple polling or vote-by-mail drop box locations using the Haversine (great-circle) formula. Core computation is implemented in C++ via Rcpp for speed.
 
