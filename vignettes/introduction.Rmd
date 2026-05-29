@@ -24,6 +24,8 @@ great-circle formula, implemented in C++ for speed. The package supports:
 - **Nearest location**: find the single closest polling place for each voter
 - **k-nearest locations**: find the k closest locations per voter
 - **Distance threshold**: find all locations within a specified radius
+- **Boundary distance**: find how far each voter lives from a geographic
+  boundary (state border, river, district line, etc.)
 - **sf integration**: pass `sf` POINT geometries directly
 
 ## Installation
@@ -31,6 +33,8 @@ great-circle formula, implemented in C++ for speed. The package supports:
 ```{r install, eval = FALSE}
 # From GitHub:
 remotes::install_github("lorenc5/Rvoterdistance")
+# or
+remotes::install_github("RPVote/Rvoterdistance")
 ```
 
 ## Included Data
@@ -150,11 +154,130 @@ summary(mi)
 haversine(35.2271, -80.8431, 35.7796, -78.6382, units = "miles")
 ```
 
+## Distance to a Geographic Boundary
+
+The `dist_to_boundary()` function computes the minimum distance from
+each voter to a geographic boundary such as a state border, river, or
+district line. The boundary is provided as an `sf` geometry object
+(LINESTRING, MULTILINESTRING, POLYGON, or MULTIPOLYGON). The
+computation uses the spherical cross-track distance formula in C++ with
+bounding-box pruning, making it practical for large voter files.
+
+### Simple boundary line
+
+```{r boundary-line, eval = requireNamespace("sf", quietly = TRUE)}
+library(sf)
+
+# Simplified AZ-NM border: a vertical line at longitude -109.05
+border <- st_sf(
+  geometry = st_sfc(
+    st_linestring(matrix(c(-109.05, 31.33,
+                            -109.05, 37.00),
+                          ncol = 2, byrow = TRUE)),
+    crs = 4326
+  )
+)
+
+# Two voters: one in Albuquerque, one near the border
+voters <- data.frame(
+  name = c("Albuquerque voter", "Border voter"),
+  lat  = c(35.08, 35.0),
+  lon  = c(-106.65, -109.0)
+)
+
+d <- dist_to_boundary(voters, border,
+  voter_coords = c("lat", "lon"),
+  units = "km", progress = FALSE
+)
+
+data.frame(voter = voters$name, dist_km = round(d, 1))
+```
+
+### Polygon boundary
+
+When the boundary is a polygon, `dist_to_boundary()` measures the
+distance to the polygon's **perimeter** (nearest edge), not to its
+interior. A point inside the polygon returns the positive distance to
+the nearest edge.
+
+```{r boundary-polygon, eval = requireNamespace("sf", quietly = TRUE)}
+# A rectangular district
+district <- st_sf(
+  geometry = st_sfc(
+    st_polygon(list(matrix(c(
+      -110, 35,
+      -108, 35,
+      -108, 37,
+      -110, 37,
+      -110, 35
+    ), ncol = 2, byrow = TRUE))),
+    crs = 4326
+  )
+)
+
+# One voter inside, one outside
+voters2 <- data.frame(
+  name = c("Inside district", "Outside district"),
+  lat  = c(36.0, 36.0),
+  lon  = c(-109.0, -107.0)
+)
+
+d2 <- dist_to_boundary(voters2, district,
+  voter_coords = c("lat", "lon"),
+  units = "miles", progress = FALSE
+)
+
+data.frame(voter = voters2$name, dist_miles = round(d2, 1))
+```
+
+### Using sf POINT voters
+
+If your voter data is already an `sf` object with POINT geometry, pass
+it directly --- no need for `voter_coords`:
+
+```{r boundary-sf-voters, eval = requireNamespace("sf", quietly = TRUE)}
+voters_sf <- st_sf(
+  name = c("Voter A", "Voter B"),
+  geometry = st_sfc(
+    st_point(c(-106.65, 35.08)),
+    st_point(c(-109.00, 35.00)),
+    crs = 4326
+  )
+)
+
+d3 <- dist_to_boundary(voters_sf, border,
+  units = "miles", progress = FALSE
+)
+
+data.frame(voter = voters_sf$name, dist_miles = round(d3, 1))
+```
+
+### Supported units
+
+`dist_to_boundary()` supports `"km"` (default), `"miles"`, and
+`"meters"`:
+
+```{r boundary-units, eval = requireNamespace("sf", quietly = TRUE)}
+voters_u <- data.frame(lat = 36.0, lon = -108.0)
+
+d_km <- dist_to_boundary(voters_u, border,
+  voter_coords = c("lat", "lon"), units = "km", progress = FALSE)
+d_mi <- dist_to_boundary(voters_u, border,
+  voter_coords = c("lat", "lon"), units = "miles", progress = FALSE)
+d_m  <- dist_to_boundary(voters_u, border,
+  voter_coords = c("lat", "lon"), units = "meters", progress = FALSE)
+
+data.frame(km = round(d_km, 2), miles = round(d_mi, 2), meters = round(d_m, 1))
+```
+
 ## Performance
 
 The Haversine computation runs in C++ and uses partial sorting
 (`std::nth_element`) for k-nearest queries, giving O(n) per voter
-instead of O(n log n). For large voter files, enable progress reporting:
+instead of O(n log n). The `dist_to_boundary()` function uses
+bounding-box pruning to skip distant boundary segments, avoiding
+unnecessary cross-track distance calculations. For large voter files,
+enable progress reporting:
 
 ```{r progress, eval = FALSE}
 result <- nearest_location(
@@ -163,5 +286,239 @@ result <- nearest_location(
   location_coords = c("lat", "lon"),
   k = 3,
   progress = TRUE
+)
+
+# Boundary distance with progress
+d <- dist_to_boundary(
+  big_voter_file, state_border,
+  voter_coords = c("lat", "lon"),
+  progress = TRUE
+)
+```
+
+## Application: Geographic Regression Discontinuity
+
+A natural application of `dist_to_boundary()` is a **geographic
+regression discontinuity design (RDD)**. The distance to a boundary
+serves as the running variable (score), with the boundary itself as
+the cutoff. Voters on one side receive a "treatment" (e.g., different
+jurisdiction, policy environment, or services) and voters on the other
+side serve as controls.
+
+This example simulates 50,000 voters around the Sandia Pueblo
+reservation in New Mexico and estimates the effect of reservation
+residence on voter turnout using the `rdrobust` package.
+
+```{r rdd-check, include = FALSE}
+has_rdd_pkgs <- requireNamespace("sf", quietly = TRUE) &&
+  requireNamespace("ggplot2", quietly = TRUE) &&
+  requireNamespace("rdrobust", quietly = TRUE)
+```
+
+### Step 1: Define the reservation boundary
+
+We use a simplified polygon approximating the Sandia Pueblo
+reservation, which sits north of Albuquerque between the Rio Grande
+and the Sandia Mountains.
+
+```{r rdd-boundary, eval = has_rdd_pkgs}
+library(sf)
+library(ggplot2)
+library(rdrobust)
+
+# Simplified Sandia Pueblo reservation boundary
+sandia_coords <- matrix(c(
+  -106.6140, 35.1850,
+  -106.5400, 35.1800,
+  -106.4800, 35.2000,
+  -106.4500, 35.2350,
+  -106.4450, 35.2700,
+  -106.4600, 35.3050,
+  -106.4900, 35.3200,
+  -106.5500, 35.3250,
+  -106.5900, 35.3100,
+  -106.6100, 35.2750,
+  -106.6200, 35.2350,
+  -106.6140, 35.1850   # close the ring
+), ncol = 2, byrow = TRUE)
+
+sandia <- st_sf(
+  name = "Sandia Pueblo",
+  geometry = st_sfc(st_polygon(list(sandia_coords)), crs = 4326)
+)
+```
+
+### Step 2: Simulate 50,000 voters
+
+Voters are drawn from a mixture of clusters reflecting actual
+population centers around the reservation: northeast Albuquerque
+(largest cluster), Bernalillo, Corrales, Rio Rancho, Placitas, and
+a sparser set on the reservation itself.
+
+```{r rdd-simulate, eval = has_rdd_pkgs}
+set.seed(2024)
+n <- 50000
+
+# Population centers: lat, lon, mixture weight, spatial spread
+#   1. NE Albuquerque / Sandia Heights  (south of reservation, dense)
+#   2. Bernalillo                        (northwest, medium)
+#   3. On/near reservation               (sparse)
+#   4. Rio Rancho                        (west, medium)
+#   5. Placitas                          (northeast, small)
+#   6. Corrales                          (west along the river)
+centers <- data.frame(
+  lat    = c(35.160, 35.310, 35.250, 35.275, 35.340, 35.235),
+  lon    = c(-106.520, -106.560, -106.530, -106.680, -106.440, -106.630),
+  weight = c(0.35, 0.18, 0.12, 0.17, 0.06, 0.12),
+  sd_lat = c(0.035, 0.025, 0.035, 0.025, 0.018, 0.018),
+  sd_lon = c(0.035, 0.025, 0.040, 0.025, 0.018, 0.018)
+)
+
+cluster <- sample(nrow(centers), n, replace = TRUE, prob = centers$weight)
+voters <- data.frame(
+  voter_id = seq_len(n),
+  lat = rnorm(n, mean = centers$lat[cluster], sd = centers$sd_lat[cluster]),
+  lon = rnorm(n, mean = centers$lon[cluster], sd = centers$sd_lon[cluster])
+)
+```
+
+### Step 3: Compute the score variable
+
+The score is the signed distance (in miles) from each voter to the
+reservation boundary: **positive** for voters inside the reservation,
+**negative** for voters outside, with **zero** at the boundary.
+
+```{r rdd-score, eval = has_rdd_pkgs}
+# Distance to the reservation boundary (unsigned, in miles)
+dist_miles <- dist_to_boundary(
+  voters, sandia,
+  voter_coords = c("lat", "lon"),
+  units = "miles",
+  progress = FALSE
+)
+
+# Determine which voters fall inside the reservation
+voters_sf <- st_as_sf(voters, coords = c("lon", "lat"), crs = 4326)
+inside <- lengths(st_intersects(voters_sf, sandia)) > 0
+
+# Signed score: positive inside, negative outside
+voters$score <- ifelse(inside, dist_miles, -dist_miles)
+voters$inside <- inside
+
+cat("Voters inside reservation:", sum(inside), "\n")
+cat("Voters outside reservation:", sum(!inside), "\n")
+summary(voters$score)
+```
+
+### Step 4: Generate voter turnout
+
+We simulate a binary turnout variable where the probability of
+voting is higher outside the reservation than inside, with a
+discontinuous jump at the boundary. A mild gradient in distance
+adds realism.
+
+```{r rdd-turnout, eval = has_rdd_pkgs}
+# Turnout probability: ~62% far outside, dropping to ~45% just inside
+turnout_prob <- 0.62 + 0.005 * voters$score   # gentle gradient
+turnout_prob[inside] <- turnout_prob[inside] - 0.15  # discontinuity
+turnout_prob <- pmin(pmax(turnout_prob, 0.10), 0.90)  # clamp
+
+voters$voted <- rbinom(n, 1, turnout_prob)
+
+cat("Overall turnout rate:", round(mean(voters$voted), 3), "\n")
+cat("Turnout inside:     ", round(mean(voters$voted[inside]), 3), "\n")
+cat("Turnout outside:    ", round(mean(voters$voted[!inside]), 3), "\n")
+```
+
+### Step 5: Histogram of the score variable
+
+The score distribution shows voter density on each side of the
+boundary. The reservation interior (positive scores) is sparsely
+populated relative to the surrounding communities.
+
+```{r rdd-histogram, eval = has_rdd_pkgs, fig.width = 7, fig.height = 4}
+ggplot(voters, aes(x = score)) +
+  geom_histogram(
+    aes(fill = inside),
+    bins = 100, alpha = 0.8, boundary = 0
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.8) +
+  scale_fill_manual(
+    values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
+    labels = c("Outside reservation", "Inside reservation"),
+    name = NULL
+  ) +
+  labs(
+    x = "Distance to reservation boundary (miles)",
+    y = "Number of voters",
+    title = "Score variable: signed distance to Sandia Pueblo boundary"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+### Step 6: Map of voters and reservation
+
+```{r rdd-map, eval = has_rdd_pkgs, fig.width = 7, fig.height = 6}
+# Plot a random sample of 5,000 voters for readability
+set.seed(99)
+voter_sample <- voters[sample(n, 5000), ]
+
+ggplot() +
+  geom_point(
+    data = voter_sample,
+    aes(x = lon, y = lat, color = score),
+    size = 0.4, alpha = 0.6
+  ) +
+  geom_sf(
+    data = sandia,
+    fill = NA, color = "black", linewidth = 1
+  ) +
+  scale_color_gradient2(
+    low = "steelblue", mid = "grey90", high = "firebrick",
+    midpoint = 0, name = "Score\n(miles)"
+  ) +
+  labs(
+    x = "Longitude", y = "Latitude",
+    title = "Simulated voters around Sandia Pueblo reservation",
+    subtitle = "Red = inside reservation, Blue = outside"
+  ) +
+  coord_sf(
+    xlim = c(-106.78, -106.35),
+    ylim = c(35.08, 35.42)
+  ) +
+  theme_minimal()
+```
+
+### Step 7: RD estimation with `rdrobust`
+
+We estimate the local average treatment effect at the boundary using
+`rdrobust()`. The running variable is the signed distance score and
+the cutoff is zero.
+
+```{r rdd-estimate, eval = has_rdd_pkgs}
+rd <- rdrobust(y = voters$voted, x = voters$score, c = 0)
+summary(rd)
+```
+
+The estimated coefficient represents the discontinuous change in
+turnout probability at the reservation boundary. A negative estimate
+indicates lower turnout just inside the reservation relative to just
+outside.
+
+### Step 8: RD plot
+
+The `rdplot()` function visualizes the local polynomial fit on each
+side of the cutoff, with binned means showing the underlying data
+pattern.
+
+```{r rdd-plot, eval = has_rdd_pkgs, fig.width = 7, fig.height = 5}
+rdplot(
+  y = voters$voted,
+  x = voters$score,
+  c = 0,
+  title = "Geographic RD: Voter turnout at Sandia Pueblo boundary",
+  x.label = "Distance to reservation boundary (miles)",
+  y.label = "Voter turnout"
 )
 ```

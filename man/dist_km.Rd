@@ -24,7 +24,9 @@ Haversine distance in kilometers for each voter to the nearest location.
 }
 \examples{
 data(meck_ev)
-d <- dist_km(voter_meck$lat, voter_meck$long,
-             early_meck$lat, early_meck$long)
+d <- dist_km(
+  voter_meck$lat, voter_meck$long,
+  early_meck$lat, early_meck$long
+)
 summary(d)
 }

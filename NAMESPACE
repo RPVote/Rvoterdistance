@@ -2,6 +2,7 @@
 
 export(dist_km)
 export(dist_mile)
+export(dist_to_boundary)
 export(haversine)
 export(nearest_location)
 importFrom(Rcpp,evalCpp)

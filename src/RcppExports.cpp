@@ -10,6 +10,23 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// cpp_dist_to_boundary
+NumericVector cpp_dist_to_boundary(NumericVector voter_lat, NumericVector voter_lon, NumericVector seg_start_lat, NumericVector seg_start_lon, NumericVector seg_end_lat, NumericVector seg_end_lon, bool show_progress);
+RcppExport SEXP _Rvoterdistance_cpp_dist_to_boundary(SEXP voter_latSEXP, SEXP voter_lonSEXP, SEXP seg_start_latSEXP, SEXP seg_start_lonSEXP, SEXP seg_end_latSEXP, SEXP seg_end_lonSEXP, SEXP show_progressSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type voter_lat(voter_latSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type voter_lon(voter_lonSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type seg_start_lat(seg_start_latSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type seg_start_lon(seg_start_lonSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type seg_end_lat(seg_end_latSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type seg_end_lon(seg_end_lonSEXP);
+    Rcpp::traits::input_parameter< bool >::type show_progress(show_progressSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_dist_to_boundary(voter_lat, voter_lon, seg_start_lat, seg_start_lon, seg_end_lat, seg_end_lon, show_progress));
+    return rcpp_result_gen;
+END_RCPP
+}
 // haversine_distance
 double haversine_distance(double lat1, double lon1, double lat2, double lon2);
 RcppExport SEXP _Rvoterdistance_haversine_distance(SEXP lat1SEXP, SEXP lon1SEXP, SEXP lat2SEXP, SEXP lon2SEXP) {
@@ -58,6 +75,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_Rvoterdistance_cpp_dist_to_boundary", (DL_FUNC) &_Rvoterdistance_cpp_dist_to_boundary, 7},
     {"_Rvoterdistance_haversine_distance", (DL_FUNC) &_Rvoterdistance_haversine_distance, 4},
     {"_Rvoterdistance_cpp_k_nearest", (DL_FUNC) &_Rvoterdistance_cpp_k_nearest, 6},
     {"_Rvoterdistance_cpp_within_threshold", (DL_FUNC) &_Rvoterdistance_cpp_within_threshold, 6},

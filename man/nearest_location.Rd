@@ -67,20 +67,23 @@ data(meck_ev)
 # Nearest single location for each voter
 result <- nearest_location(voter_meck, early_meck,
   voter_coords = c("lat", "long"),
-  location_coords = c("lat", "long"))
+  location_coords = c("lat", "long")
+)
 head(result)
 
 # 3 nearest locations per voter
 result_k3 <- nearest_location(voter_meck, early_meck,
   voter_coords = c("lat", "long"),
   location_coords = c("lat", "long"),
-  k = 3)
+  k = 3
+)
 head(result_k3)
 
 # All locations within 10 km
 result_10km <- nearest_location(voter_meck, early_meck,
   voter_coords = c("lat", "long"),
   location_coords = c("lat", "long"),
-  max_dist = 10, units = "km")
+  max_dist = 10, units = "km"
+)
 head(result_10km)
 }
