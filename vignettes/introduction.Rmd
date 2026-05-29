@@ -171,9 +171,13 @@ library(sf)
 # Simplified AZ-NM border: a vertical line at longitude -109.05
 border <- st_sf(
   geometry = st_sfc(
-    st_linestring(matrix(c(-109.05, 31.33,
-                            -109.05, 37.00),
-                          ncol = 2, byrow = TRUE)),
+    st_linestring(matrix(
+      c(
+        -109.05, 31.33,
+        -109.05, 37.00
+      ),
+      ncol = 2, byrow = TRUE
+    )),
     crs = 4326
   )
 )
@@ -261,11 +265,14 @@ data.frame(voter = voters_sf$name, dist_miles = round(d3, 1))
 voters_u <- data.frame(lat = 36.0, lon = -108.0)
 
 d_km <- dist_to_boundary(voters_u, border,
-  voter_coords = c("lat", "lon"), units = "km", progress = FALSE)
+  voter_coords = c("lat", "lon"), units = "km", progress = FALSE
+)
 d_mi <- dist_to_boundary(voters_u, border,
-  voter_coords = c("lat", "lon"), units = "miles", progress = FALSE)
-d_m  <- dist_to_boundary(voters_u, border,
-  voter_coords = c("lat", "lon"), units = "meters", progress = FALSE)
+  voter_coords = c("lat", "lon"), units = "miles", progress = FALSE
+)
+d_m <- dist_to_boundary(voters_u, border,
+  voter_coords = c("lat", "lon"), units = "meters", progress = FALSE
+)
 
 data.frame(km = round(d_km, 2), miles = round(d_mi, 2), meters = round(d_m, 1))
 ```
@@ -339,7 +346,7 @@ sandia_coords <- matrix(c(
   -106.5900, 35.3100,
   -106.6100, 35.2750,
   -106.6200, 35.2350,
-  -106.6140, 35.1850   # close the ring
+  -106.6140, 35.1850 # close the ring
 ), ncol = 2, byrow = TRUE)
 
 sandia <- st_sf(
@@ -419,9 +426,9 @@ adds realism.
 
 ```{r rdd-turnout, eval = has_rdd_pkgs}
 # Turnout probability: ~62% far outside, dropping to ~45% just inside
-turnout_prob <- 0.62 + 0.005 * voters$score   # gentle gradient
-turnout_prob[inside] <- turnout_prob[inside] - 0.15  # discontinuity
-turnout_prob <- pmin(pmax(turnout_prob, 0.10), 0.90)  # clamp
+turnout_prob <- 0.62 + 0.005 * voters$score # gentle gradient
+turnout_prob[inside] <- turnout_prob[inside] - 0.15 # discontinuity
+turnout_prob <- pmin(pmax(turnout_prob, 0.10), 0.90) # clamp
 
 voters$voted <- rbinom(n, 1, turnout_prob)
 

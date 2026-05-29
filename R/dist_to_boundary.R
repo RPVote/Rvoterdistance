@@ -47,9 +47,9 @@
 #' dist_to_boundary(voters, border, voter_coords = c("lat", "lon"))
 #' }
 dist_to_boundary <- function(voters, boundary,
-                              voter_coords = NULL,
-                              units = c("km", "miles", "meters"),
-                              progress = TRUE) {
+                             voter_coords = NULL,
+                             units = c("km", "miles", "meters"),
+                             progress = TRUE) {
   units <- match.arg(units)
 
   if (!requireNamespace("sf", quietly = TRUE)) {
